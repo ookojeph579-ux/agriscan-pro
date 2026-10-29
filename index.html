@@ -1,0 +1,864 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#176b3a">
+<title>AgriScan Pro</title>
+<style>
+:root {
+  --g:#176b3a;--g2:#e8f5e9;--bg:#f4f8f4;
+  --text:#193326;--muted:#66766a;--white:#fff;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+font-family:Arial,sans-serif}
+header{background:var(--g);color:white;padding:19px;
+border-radius:0 0 22px 22px}
+.brand{font-size:24px;font-weight:bold}
+.brand span{color:#a8ee98}
+header p{font-size:13px;margin-bottom:0}
+main{max-width:700px;margin:auto;padding:16px 13px 95px}
+h2{font-size:21px}h3{font-size:16px}
+.card{background:white;padding:16px;border-radius:17px;
+margin-bottom:14px;box-shadow:0 3px 12px #0000000b}
+.welcome{background:var(--g2)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+button{font:inherit;cursor:pointer}
+.primary,.secondary{border:0;padding:12px 15px;border-radius:11px}
+.primary{background:var(--g);color:white;font-weight:bold}
+.secondary{background:var(--g2);color:var(--g)}
+.action{background:white;border:1px solid #e0e9e1;
+padding:14px;border-radius:13px;text-align:left;color:var(--text)}
+.action span{display:block;font-size:24px;margin-bottom:7px}
+label{font-size:13px;font-weight:bold;display:block;margin-top:12px}
+input,select,textarea{width:100%;padding:12px;margin:6px 0;
+border:1px solid #d5dfd7;border-radius:10px;background:white;
+font:inherit;color:var(--text)}
+.muted{color:var(--muted);font-size:13px;line-height:1.5}
+.screen{display:none}.screen.active{display:block}
+nav{position:fixed;bottom:0;left:0;right:0;background:white;
+display:flex;justify-content:space-around;padding:8px 0;
+padding-bottom:calc(8px + env(safe-area-inset-bottom));
+box-shadow:0 -3px 15px #0001;z-index:5}
+nav button{background:none;border:0;color:var(--muted);font-size:10px}
+nav button span{display:block;font-size:21px;margin-bottom:3px}
+nav button.active{color:var(--g);font-weight:bold}
+.crop{border:1px solid #cce1cf;background:var(--g2);
+color:var(--g);padding:9px 12px;border-radius:22px}
+.crop.selected{background:var(--g);color:white}
+.crop-list{display:flex;flex-wrap:wrap;gap:8px}
+.preview{width:100%;max-height:330px;object-fit:contain;
+background:#e9f2e9;border-radius:12px;margin-top:10px}
+.status{padding:12px;border-radius:10px;background:var(--g2);
+font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.hidden{display:none!important}
+.row{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.item{padding:12px 0;border-bottom:1px solid #e7eee8}
+.badge{font-size:12px;padding:5px 8px;border-radius:20px;
+background:var(--g2);color:var(--g)}
+.danger{background:#fff0ed;color:#a62b1b}
+#mapCanvas{width:100%;height:230px;background:#eaf3e8;
+border-radius:12px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">🌱 AgriScan <span>Pro</span></div>
+  <p>Smart Farming. Clear Decisions.</p>
+</header>
+
+<main>
+<!-- HOME -->
+<section id="home" class="screen active">
+  <div class="card welcome">
+    <h2 id="welcome">Welcome, Farmer! 👋</h2>
+    <p>Know your crops. Record your fields. Make informed decisions.</p>
+    <button class="primary" onclick="go('scan')">📷 Scan a Crop</button>
+  </div>
+  <div class="grid">
+    <div class="card"><span class="muted">My Crops</span>
+      <h2 id="cropCount">0</h2></div>
+    <div class="card"><span class="muted">Saved Scans</span>
+      <h2 id="scanCount">0</h2></div>
+  </div>
+  <div class="card">
+    <h3>Quick Actions</h3>
+    <div class="grid">
+      <button class="action" onclick="go('farm')"><span>🌾</span>My Farm</button>
+      <button class="action" onclick="go('scan')"><span>🔍</span>AI Crop Scan</button>
+      <button class="action" onclick="go('map')"><span>🗺️</span>Field Records</button>
+      <button class="action" onclick="go('reports')"><span>📊</span>Reports</button>
+    </div>
+  </div>
+  <div class="card">
+    <h3>My Crops</h3><div id="homeCrops" class="crop-list"></div>
+  </div>
+  <div class="card">
+    <h3>Connection</h3><p id="connection" class="status"></p>
+    <p class="muted">Your saved records can work offline when local storage
+    is available. Online AI services require internet.</p>
+  </div>
+</section>
+
+<!-- FARM -->
+<section id="farm" class="screen">
+  <h2>My Farm Profile</h2>
+  <form id="farmForm" class="card">
+    <label for="farmer">Farmer name</label>
+    <input id="farmer" placeholder="Your name">
+    <label for="farmName">Farm name</label>
+    <input id="farmName" placeholder="Name of your farm">
+    <label for="location">Location</label>
+    <input id="location" placeholder="County, town or village">
+    <label for="size">Farm size in acres</label>
+    <input id="size" type="number" min="0" step="any">
+    <label for="temperature">Temperature °C (measured)</label>
+    <input id="temperature" type="number" step="any"
+      placeholder="Optional sensor or thermometer reading">
+    <label for="ph">Soil pH (measured)</label>
+    <input id="ph" type="number" min="0" max="14" step="0.1">
+    <label for="moisture">Soil moisture % (measured)</label>
+    <input id="moisture" type="number" min="0" max="100">
+    <h3>Select crops grown</h3>
+    <div id="cropOptions" class="crop-list"></div>
+    <button class="primary" type="submit" style="width:100%;margin-top:17px">
+      Save Farm Profile
+    </button>
+    <p id="farmMessage" class="status hidden"></p>
+  </form>
+</section>
+
+<!-- SCAN AND AI -->
+<section id="scan" class="screen">
+  <h2>AI Crop Scanner</h2>
+  <div class="card">
+    <p class="muted" id="scanInstructions">Take a clear photograph of the whole plant or affected leaf in good lighting. Crop selection is optional; automatic crop recognition requires a compatible trained model.</p>
+    <label for="language">Language / Lugha</label>
+    <select id="language">
+      <option value="en">English</option>
+      <option value="sw">Kiswahili</option>
+    </select>
+    <label for="scanCrop">Crop (optional)</label>
+    <select id="scanCrop"><option value="">Let the model identify the crop</option></select>
+
+    <label for="camera">Take photo with camera</label>
+    <input id="camera" type="file" accept="image/*" capture="environment">
+    <label for="gallery">Upload from gallery</label>
+    <input id="gallery" type="file" accept="image/*">
+    <img id="preview" class="preview hidden" alt="Crop photo preview">
+
+    <label for="symptoms">Symptoms you have noticed</label>
+    <textarea id="symptoms" rows="3"
+      placeholder="For example, yellow leaves or brown spots"></textarea>
+
+    <button id="analyse" class="primary" style="width:100%;margin-top:10px">
+      Analyse Crop
+    </button>
+    <p id="aiStatus" class="status">Select a crop and photograph to begin.</p>
+    <div id="result" class="hidden">
+      <h3 id="resultsHeading">Analysis Results</h3>
+      <div class="status">
+        <p><strong id="healthLabel">Plant status:</strong> <span id="healthResult">Not assessed</span></p>
+        <p><strong id="cropLabel">Crop:</strong> <span id="detectedCrop">Not identified</span></p>
+        <p><strong id="problemLabel">Possible problem:</strong> <span id="detectedProblem">Not identified</span></p>
+        <p><strong id="severityLabel">Severity:</strong> <span id="severityResult">Not assessed by the current model</span></p>
+        <p><strong id="confidenceLabel">Model score:</strong> <span id="confidenceResult">Not available</span></p>
+      </div>
+      <h3 id="recommendHeading">Recommended next steps</h3>
+      <div id="recommendations" class="status">Recommendations will appear when a verified diagnosis and crop-specific guidance are available.</div>
+      <p class="muted" id="safetyNote">An image-model score is not proof of disease. Check symptoms and local agricultural guidance before treatment. Never mix or apply chemicals based only on an uncertain prediction.</p>
+      <button class="secondary" onclick="saveObservation()" id="saveObservationButton">Save Observation</button>
+    </div>
+  </div>
+  <div class="card">
+    <h3>AI Model Status</h3>
+    <p id="modelStatus" class="status">Starting automatic tea-model loading…</p>
+    <p class="muted">AgriScan Pro loads its trained tea-leaf model automatically when this page and the model file are hosted together. No manual model selection is needed. Internet is required to load the AI runtime.</p>
+    <p class="muted">This model recognises tea-leaf classes only. Predictions are not validated diagnoses; confirm uncertain results with a local agricultural officer before treatment.</p>
+  </div>
+</section>
+
+<!-- FIELD MAP -->
+<section id="map" class="screen">
+  <h2>Farm Fields</h2>
+  <div class="card">
+    <p class="muted">Record field names and optional GPS coordinates.
+    This simple view is not a surveyed or navigable map.</p>
+    <label for="fieldName">Field name</label>
+    <input id="fieldName" placeholder="e.g. North Field">
+    <label for="fieldCrop">Crop</label>
+    <select id="fieldCrop"><option value="">Select crop</option></select>
+    <label for="lat">Latitude (optional)</label>
+    <input id="lat" type="number" step="any" placeholder="-0.1234">
+    <label for="lon">Longitude (optional)</label>
+    <input id="lon" type="number" step="any" placeholder="37.1234">
+    <button class="secondary" onclick="getGPS()">Use Phone GPS</button>
+    <button class="primary" onclick="saveField()">Save Field</button>
+    <p id="fieldMessage" class="status hidden"></p>
+  </div>
+  <div class="card"><h3>Saved Fields</h3><div id="fields"></div></div>
+  <div class="card">
+    <h3>Future Drone Support</h3>
+    <p class="muted">Saved field coordinates can help prepare for future
+    mapping integrations. Drone flight and spraying controls are not enabled.</p>
+  </div>
+</section>
+
+<!-- REPORTS -->
+<section id="reports" class="screen">
+  <h2>Reports & History</h2>
+  <div class="card">
+    <div class="row"><h3>Saved Observations</h3>
+      <button class="secondary" onclick="renderScans()">Refresh</button></div>
+    <div id="history"></div>
+    <button class="secondary" onclick="exportData()">Export Farm Data</button>
+  </div>
+</section>
+
+<!-- SETTINGS -->
+<section id="more" class="screen">
+  <h2>Settings & Future Features</h2>
+  <div class="card">
+    <h3>📡 Offline Mode</h3>
+    <p>Farm details, field records and scan notes are saved locally when
+    browser storage is available. An installed model is required for offline
+    AI image recognition.</p>
+  </div>
+  <div class="card">
+    <h3>🛸 Drone Integration</h3>
+    <p>Planned: aerial imagery, field mapping, crop-health monitoring and
+    reviewed mission plans for compatible drones.</p>
+  </div>
+  <div class="card">
+    <h3>🔮 Predictive Insights</h3>
+    <p>Future versions can use verified weather data, crop history and
+    sensor measurements to estimate risk. Predictions are not yet active.</p>
+  </div>
+  <div class="card">
+    <h3>💾 Data & Privacy</h3>
+    <p class="muted">Data is stored in this browser on this device.
+    It is not a secure multi-user account system. Avoid storing sensitive
+    personal information on shared devices.</p>
+    <button class="secondary" onclick="exportData()">Export My Data</button>
+  </div>
+</section>
+</main>
+
+<nav>
+  <button class="active" data-page="home" onclick="go('home')"><span>⌂</span>Home</button>
+  <button data-page="farm" onclick="go('farm')"><span>🌾</span>Farm</button>
+  <button data-page="scan" onclick="go('scan')"><span>◎</span>Scan</button>
+  <button data-page="map" onclick="go('map')"><span>🗺️</span>Fields</button>
+  <button data-page="reports" onclick="go('reports')"><span>▤</span>Reports</button>
+  <button data-page="more" onclick="go('more')"><span>☰</span>More</button>
+</nav>
+
+<script>
+"use strict";
+
+
+const CROPS = [
+  // Cereals and grains
+  "Maize", "Wheat", "Rice", "Sorghum", "Finger Millet",
+  "Pearl Millet", "Barley", "Oats",
+
+  // Legumes and pulses
+  "Common Beans", "Green Grams", "Cowpeas", "Pigeon Peas",
+  "Chickpeas", "Lentils", "Soybeans", "Groundnuts",
+
+  // Cash and industrial crops
+  "Tea", "Coffee", "Sugarcane", "Cotton",
+  "Pyrethrum", "Tobacco", "Sisal",
+
+  // Roots and tubers
+  "Irish Potato", "Sweet Potato", "Cassava", "Yam",
+  "Arrowroot",
+
+  // Vegetables
+  "Tomato", "Onion", "Cabbage", "Kale (Sukuma Wiki)",
+  "Spinach", "African Nightshade", "Amaranth",
+  "Carrot", "Capsicum", "Eggplant", "Okra",
+  "Cucumber", "Pumpkin", "Watermelon",
+
+  // Fruits
+  "Banana", "Avocado", "Mango", "Orange",
+  "Lemon", "Pawpaw", "Pineapple", "Passion Fruit",
+  "Guava", "Tree Tomato", "Strawberry",
+
+  // Nuts, oil crops and other important crops
+  "Macadamia", "Cashew Nut", "Sunflower",
+  "Canola", "Sesame", "Moringa",
+
+  // Fodder and forage
+  "Napier Grass", "Lucerne", "Rhodes Grass"
+];
+
+const KEY = "agriscan_pro_v1";
+
+let data = {profile:{},scans:[],fields:[]};
+let selectedCrops = [];
+let photoData = null;
+let lastAnalysis = null;
+let model = null;
+let modelLabels = [];
+let storageOK = true;
+
+/* Tea model integration: use a pinned TFLite runtime/WASM version to avoid mismatched runtime assets. */
+const AI_CONFIG = {
+  inputSize: 224,
+  tfjsModelUrl: "./model/model.json",
+  tfliteModelUrl: "./agriscan_tea_model.tflite",
+  tfjsUrl: "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js",
+  tfliteUrl: "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite@0.0.1-alpha.8/dist/tf-tflite.min.js",
+  wasmPath: "https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite@0.0.1-alpha.8/dist/"
+};
+const TEA_LABELS = [
+  "Anthracnose", "algal_leaf", "bird_eye_spot", "brown_blight",
+  "gray_light", "healthy", "red_leaf_spot", "white_spot"
+];
+let modelLoading = false;
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      data = {
+        profile: parsed.profile || {},
+        scans: Array.isArray(parsed.scans) ? parsed.scans : [],
+        fields: Array.isArray(parsed.fields) ? parsed.fields : []
+      };
+    }
+  } catch (e) {
+    storageOK = false;
+  }
+}
+
+function persist() {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(data));
+    return true;
+  } catch (e) {
+    storageOK = false;
+    return false;
+  }
+}
+
+function go(page) {
+  document.querySelectorAll(".screen").forEach(el =>
+    el.classList.toggle("active", el.id === page));
+  document.querySelectorAll("nav button").forEach(el =>
+    el.classList.toggle("active", el.dataset.page === page));
+  window.scrollTo(0, 0);
+}
+
+function el(id) { return document.getElementById(id); }
+
+function makeCropControls() {
+  const options = el("cropOptions");
+  const scanCrop = el("scanCrop");
+  const fieldCrop = el("fieldCrop");
+
+  CROPS.forEach(crop => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "crop";
+    b.textContent = crop;
+    b.onclick = () => {
+      selectedCrops = selectedCrops.includes(crop)
+        ? selectedCrops.filter(c => c !== crop)
+        : [...selectedCrops, crop];
+      b.classList.toggle("selected", selectedCrops.includes(crop));
+      renderCrops();
+    };
+    options.appendChild(b);
+
+    [scanCrop, fieldCrop].forEach(select => {
+      const op = document.createElement("option");
+      op.value = crop;
+      op.textContent = crop;
+      select.appendChild(op);
+    });
+  });
+}
+
+function renderCrops() {
+  el("cropCount").textContent = selectedCrops.length;
+  const home = el("homeCrops");
+  home.replaceChildren();
+
+  selectedCrops.forEach(crop => {
+    const tag = document.createElement("span");
+    tag.className = "crop";
+    tag.textContent = "🌱 " + crop;
+    home.appendChild(tag);
+  });
+
+  if (!selectedCrops.length) {
+    home.textContent = "No crops added yet.";
+  }
+}
+
+function loadProfile() {
+  const p = data.profile;
+  el("farmer").value = p.farmer || "";
+  el("farmName").value = p.farmName || "";
+  el("location").value = p.location || "";
+  el("size").value = p.size || "";
+  el("temperature").value = p.temperature ?? "";
+  el("ph").value = p.ph ?? "";
+  el("moisture").value = p.moisture ?? "";
+  selectedCrops = Array.isArray(p.crops) ? [...p.crops] : [];
+
+  document.querySelectorAll("#cropOptions button").forEach(b =>
+    b.classList.toggle("selected", selectedCrops.includes(b.textContent)));
+
+  el("welcome").textContent = p.farmer
+    ? "Welcome, " + p.farmer + "! 👋" : "Welcome, Farmer! 👋";
+  renderCrops();
+}
+
+el("farmForm").addEventListener("submit", event => {
+  event.preventDefault();
+  const ph = el("ph").value;
+  const moisture = el("moisture").value;
+  const size = el("size").value;
+
+  if (ph !== "" && (+ph < 0 || +ph > 14)) {
+    el("farmMessage").textContent = "Soil pH must be between 0 and 14.";
+    el("farmMessage").classList.remove("hidden");
+    return;
+  }
+  if (moisture !== "" && (+moisture < 0 || +moisture > 100)) {
+    el("farmMessage").textContent =
+      "Soil moisture percentage must be between 0 and 100.";
+    el("farmMessage").classList.remove("hidden");
+    return;
+  }
+  if (size !== "" && +size < 0) {
+    el("farmMessage").textContent = "Farm size cannot be negative.";
+    el("farmMessage").classList.remove("hidden");
+    return;
+  }
+
+  data.profile = {
+    farmer: el("farmer").value.trim(),
+    farmName: el("farmName").value.trim(),
+    location: el("location").value.trim(),
+    size, temperature: el("temperature").value,
+    ph, moisture, crops: [...selectedCrops]
+  };
+
+  const msg = el("farmMessage");
+  msg.classList.remove("hidden");
+  msg.textContent = persist()
+    ? "Farm profile saved on this device."
+    : "Could not save. Browser storage may be unavailable or full.";
+  loadProfile();
+});
+
+const SCAN_TEXT = {
+  en: {
+    instructions: "Take a clear photograph of the whole plant or affected leaf in good lighting. Crop selection is optional; automatic crop recognition requires a compatible trained model.",
+    selectCrop: "Let the model identify the crop", analyse: "Analyse Crop", ready: "Image ready. Tap Analyse Crop.",
+    choosePhoto: "Take a photo or upload an image first.", noModel: "No compatible trained AI model is installed. The photo is ready, but this app cannot yet identify the crop, disease, pest, or severity reliably. You can save the photo observation and symptoms in your records.",
+    results: "Analysis Results", health: "Plant status:", crop: "Crop:", problem: "Possible problem:", severity: "Severity:", score: "Model score:", next: "Recommended next steps", notAssessed: "Not assessed by the current model", notIdentified: "Not identified", recommendations: "Crop-specific recommendations will appear after a verified diagnosis is available. For now, inspect both sides of leaves, note how widely symptoms are spreading, and ask a local agricultural extension officer if the problem is worsening.", safety: "An image-model score is not proof of disease. Check symptoms and local agricultural guidance before treatment. Never mix or apply chemicals based only on an uncertain prediction.", save: "Save Observation", healthy: "No disease status can be confirmed from this model output.", prediction: "Model prediction: "
+  },
+  sw: {
+    instructions: "Piga picha iliyo wazi ya mmea mzima au jani lililoathirika katika mwanga mzuri. Kuchagua aina ya zao si lazima; utambuzi wa moja kwa moja unahitaji modeli ya AI iliyofunzwa na inayolingana.",
+    selectCrop: "Acha modeli itambue zao", analyse: "Changanua Zao", ready: "Picha iko tayari. Bonyeza Changanua Zao.",
+    choosePhoto: "Piga picha au chagua picha kwanza.", noModel: "Hakuna modeli ya AI iliyofunzwa na inayolingana iliyowekwa. Picha iko tayari, lakini programu bado haiwezi kutambua zao, ugonjwa, mdudu au kiwango cha athari kwa uhakika. Unaweza kuhifadhi maelezo na dalili.",
+    results: "Matokeo ya Uchambuzi", health: "Hali ya mmea:", crop: "Zao:", problem: "Tatizo linalowezekana:", severity: "Kiwango cha athari:", score: "Alama ya modeli:", next: "Hatua zinazopendekezwa", notAssessed: "Halijapimwa na modeli ya sasa", notIdentified: "Halijatambuliwa", recommendations: "Mapendekezo maalum ya zao yataonekana baada ya utambuzi uliothibitishwa. Kwa sasa, kagua pande zote za majani, angalia jinsi dalili zinavyoenea, na wasiliana na afisa wa ugani wa kilimo ikiwa hali inazidi kuwa mbaya.", safety: "Alama ya modeli ya picha si uthibitisho wa ugonjwa. Kagua dalili na utafute ushauri wa kilimo wa eneo lako kabla ya kutibu. Usichanganye au kutumia kemikali kwa kutegemea utabiri usio na uhakika pekee.", save: "Hifadhi Uchunguzi", healthy: "Hali ya afya haiwezi kuthibitishwa kutokana na matokeo haya ya modeli.", prediction: "Utabiri wa modeli: "
+  }
+};
+
+function applyScanLanguage() {
+  const t = SCAN_TEXT[el("language")?.value || "en"];
+  if (!t) return;
+  el("scanInstructions").textContent = t.instructions;
+  el("scanCrop").options[0].textContent = t.selectCrop;
+  el("analyse").textContent = t.analyse;
+  el("resultsHeading").textContent = t.results;
+  el("healthLabel").textContent = t.health;
+  el("cropLabel").textContent = t.crop;
+  el("problemLabel").textContent = t.problem;
+  el("severityLabel").textContent = t.severity;
+  el("confidenceLabel").textContent = t.score;
+  el("recommendHeading").textContent = t.next;
+  el("saveObservationButton").textContent = t.save;
+  el("safetyNote").textContent = t.safety;
+}
+
+el("language").addEventListener("change", applyScanLanguage);
+
+function loadImage(file) {
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    alert("Please select an image.");
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    alert("Choose an image smaller than 10 MB.");
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    photoData = reader.result;
+    el("preview").src = photoData;
+    el("preview").classList.remove("hidden");
+    el("result").classList.add("hidden");
+    lastAnalysis = null;
+    const t = SCAN_TEXT[el("language").value || "en"];
+    el("aiStatus").textContent = t.ready;
+  };
+  reader.onerror = () => {
+    el("aiStatus").textContent = "Unable to read this image.";
+  };
+  reader.readAsDataURL(file);
+}
+
+el("camera").addEventListener("change", e => loadImage(e.target.files[0]));
+el("gallery").addEventListener("change", e => loadImage(e.target.files[0]));
+
+function loadExternalScript(src) {
+  return new Promise((resolve, reject) => {
+    const existing = [...document.scripts].find(script => script.src === src);
+    if (existing) {
+      if (existing.dataset.loaded === "true") return resolve();
+      existing.addEventListener("load", resolve, {once:true});
+      existing.addEventListener("error", () => reject(new Error("Could not load AI runtime script")), {once:true});
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = src;
+    script.onload = () => { script.dataset.loaded = "true"; resolve(); };
+    script.onerror = () => reject(new Error("Could not load AI runtime script. Check your internet connection."));
+    document.head.appendChild(script);
+  });
+}
+
+async function setupAI() {
+  const status = el("modelStatus");
+  status.textContent = "Starting AI runtime… please wait.";
+  if (!window.tf) await loadExternalScript(AI_CONFIG.tfjsUrl);
+  if (!window.tf || !tf.setBackend) throw new Error("TensorFlow.js core did not load.");
+  if (typeof tf.setBackend === "function") await tf.setBackend("cpu");
+  if (typeof tf.ready === "function") await tf.ready();
+  if (!window.tflite) await loadExternalScript(AI_CONFIG.tfliteUrl);
+  if (!window.tflite || typeof tflite.loadTFLiteModel !== "function") {
+    throw new Error("TensorFlow Lite browser runtime did not load. Check internet and reload the page.");
+  }
+  if (typeof tflite.setWasmPath === "function") {
+    tflite.setWasmPath("https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite@0.0.1-alpha.8/dist/");
+  }
+  status.textContent = "AI runtime ready. Loading the tea model automatically…";
+}
+
+async function analysePhoto() {
+  const selectedCrop = el("scanCrop").value || "";
+  const crop = selectedCrop || "Tea";
+  const t = SCAN_TEXT[el("language").value || "en"];
+  if (!photoData) {
+    el("aiStatus").textContent = t.choosePhoto;
+    return;
+  }
+
+  el("analyse").disabled = true;
+  el("aiStatus").textContent = "Preparing image analysis…";
+
+  try {
+    if (!model || !window.tf) {
+      el("aiStatus").textContent = "The tea AI model is still loading or could not be found. Keep this page hosted beside agriscan_tea_model.tflite, then reload the page.";
+      el("result").classList.add("hidden");
+      return;
+    }
+    if (selectedCrop && !/tea/i.test(selectedCrop)) {
+      el("aiStatus").textContent = "This trained model recognises tea-leaf classes only. Clear the crop selection or select Tea before analysing.";
+      el("result").classList.add("hidden");
+      return;
+    }
+
+    /* Input is prepared as float32 RGB, 224x224, scaled to [0,1]. This must
+       match the preprocessing used when the model was trained. If training
+       used a different range or colour order, the predictions will be unreliable. */
+    const img = new Image();
+    img.src = photoData;
+    await img.decode();
+
+    const tensor = tf.tidy(() => {
+      return tf.browser.fromPixels(img)
+        .resizeBilinear([AI_CONFIG.inputSize, AI_CONFIG.inputSize])
+        .toFloat()
+        .div(255)
+        .expandDims(0);
+    });
+
+    let prediction;
+    let outputTensor;
+    try {
+      prediction = model.predict(tensor);
+      // Some TFLite wrappers return one tensor; others return an array of tensors.
+      outputTensor = Array.isArray(prediction) ? prediction[0] : prediction;
+      if (!outputTensor || typeof outputTensor.data !== "function") {
+        throw new Error("The model returned an unsupported output. Check that it is an image-classification TFLite model.");
+      }
+      const scores = await outputTensor.data();
+      if (!scores || scores.length !== TEA_LABELS.length) {
+        throw new Error("Expected 8 tea-class scores, but the model returned " + (scores ? scores.length : 0) + ". The model output does not match the app's tea labels.");
+      }
+      const ranked = Array.from(scores).map((score, index) => ({
+        label: modelLabels[index] || ("Class " + index),
+        score: Number(score)
+      })).sort((a,b) => b.score - a.score);
+
+      const top = ranked[0];
+      lastAnalysis = {
+        crop,
+        label: top.label,
+        confidence: top.score,
+        symptoms: el("symptoms").value.trim(),
+        date: new Date().toISOString(),
+        modelBased: true
+      };
+
+      const labelLower = String(top.label).toLowerCase();
+      const likelyHealthy = /healthy|normal|healthy leaf|healthy plant/.test(labelLower);
+      el("healthResult").textContent = likelyHealthy
+        ? (el("language").value === "sw" ? "Inaonekana yenye afya (thibitisha kwa ukaguzi)" : "Likely healthy (confirm by inspection)")
+        : (el("language").value === "sw" ? "Huenda imeathirika; thibitisha" : "Possible issue; confirm diagnosis");
+      el("detectedCrop").textContent = crop;
+      el("detectedProblem").textContent = top.label;
+      el("severityResult").textContent = t.notAssessed;
+      el("confidenceResult").textContent = (top.score * 100).toFixed(1) + "% (model score, not a guaranteed probability)";
+      el("recommendations").textContent = t.recommendations;
+      el("result").classList.remove("hidden");
+      el("aiStatus").textContent = "Model analysis complete.";
+    } finally {
+      tensor.dispose();
+      if (Array.isArray(prediction)) {
+        prediction.forEach(output => { if (output && typeof output.dispose === "function") output.dispose(); });
+      } else if (prediction && typeof prediction.dispose === "function") {
+        prediction.dispose();
+      }
+    }
+  } catch (error) {
+    el("aiStatus").textContent =
+      "Analysis failed: " + error.message +
+      ". Check the model format and try again.";
+  } finally {
+    el("analyse").disabled = false;
+  }
+}
+
+el("analyse").addEventListener("click", analysePhoto);
+
+function saveObservation() {
+  // The current trained model is tea-only, so use Tea when the farmer leaves
+  // the optional crop selector blank after a tea-model analysis.
+  const crop = el("scanCrop").value || (lastAnalysis && lastAnalysis.modelBased ? lastAnalysis.crop : "Tea");
+  if (!photoData) {
+    el("aiStatus").textContent = "Take or upload a photo first.";
+    return;
+  }
+
+  data.scans.unshift({
+    crop,
+    symptoms: el("symptoms").value.trim(),
+    date: new Date().toLocaleString(),
+    photoSaved: false,
+    prediction: lastAnalysis ? {
+      label: lastAnalysis.label,
+      confidence: lastAnalysis.confidence
+    } : null
+  });
+if (persist()) {
+    el("aiStatus").textContent =
+      "Observation saved. The image itself is not stored permanently.";
+    renderScans();
+  } else {
+    data.scans.shift();
+    el("aiStatus").textContent =
+      "Could not save. Storage may be full.";
+  }
+}
+
+function renderScans() {
+  const history = el("history");
+  history.replaceChildren();
+  el("scanCount").textContent = data.scans.length;
+
+  if (!data.scans.length) {
+    history.textContent = "No observations saved yet.";
+    return;
+  }
+
+  data.scans.forEach(scan => {
+    const box = document.createElement("div");
+    box.className = "item";
+    const title = document.createElement("strong");
+    title.textContent = scan.crop + " — " + scan.date;
+    const note = document.createElement("p");
+    note.textContent = scan.symptoms || "No symptoms recorded.";
+    box.append(title, note);
+
+    if (scan.prediction) {
+      const result = document.createElement("p");
+      result.textContent = "Model prediction: " + scan.prediction.label;
+      box.appendChild(result);
+    }
+    history.appendChild(box);
+  });
+}
+
+function saveField() {
+  const name = el("fieldName").value.trim();
+  const crop = el("fieldCrop").value;
+  const latText = el("lat").value;
+  const lonText = el("lon").value;
+  const msg = el("fieldMessage");
+  msg.classList.remove("hidden");
+
+  if (!name || !crop) {
+    msg.textContent = "Enter a field name and choose its crop.";
+    return;
+  }
+
+  const lat = latText === "" ? null : Number(latText);
+  const lon = lonText === "" ? null : Number(lonText);
+
+  if ((lat === null) !== (lon === null) ||
+      (lat !== null && (!Number.isFinite(lat) ||
+       !Number.isFinite(lon) || Math.abs(lat) > 90 ||
+       Math.abs(lon) > 180))) {
+    msg.textContent = "Enter valid latitude and longitude together.";
+    return;
+  }
+
+  data.fields.push({name,crop,lat,lon});
+  msg.textContent = persist() ? "Field saved." : "Could not save field.";
+  renderFields();
+}
+
+function getGPS() {
+  if (!navigator.geolocation) {
+    el("fieldMessage").textContent = "GPS is not supported by this browser.";
+    el("fieldMessage").classList.remove("hidden");
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(pos => {
+    el("lat").value = pos.coords.latitude.toFixed(6);
+    el("lon").value = pos.coords.longitude.toFixed(6);
+    el("fieldMessage").textContent = "Location received.";
+    el("fieldMessage").classList.remove("hidden");
+  }, () => {
+    el("fieldMessage").textContent =
+      "Location unavailable. Allow permission and try again.";
+    el("fieldMessage").classList.remove("hidden");
+  });
+}
+
+function renderFields() {
+  const list = el("fields");
+  list.replaceChildren();
+
+  if (!data.fields.length) {
+    list.textContent = "No fields recorded yet.";
+    return;
+  }
+
+  data.fields.forEach(field => {
+    const item = document.createElement("div");
+    item.className = "item";
+    const name = document.createElement("strong");
+    name.textContent = field.name;
+    const details = document.createElement("p");
+    details.textContent = field.crop +
+      (field.lat !== null ? " · " + field.lat + ", " + field.lon : "");
+    item.append(name, details);
+    list.appendChild(item);
+  });
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(data, null, 2)],
+    {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "agriscan-farm-data.json";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function updateConnection() {
+  el("connection").textContent = navigator.onLine
+    ? "Online — internet detected."
+    : "Offline — internet unavailable.";
+}
+
+makeCropControls();
+applyScanLanguage();
+loadData();
+loadProfile();
+renderScans();
+renderFields();
+updateConnection();
+
+async function loadTeaModelAutomatically() {
+  const status = el("modelStatus");
+  status.textContent = "Loading the tea AI runtime and checking the model file…";
+  if (modelLoading) return;
+  modelLoading = true;
+  let stage = "starting the AI runtime";
+  try {
+    await setupAI();
+
+    // First fetch the model ourselves so file-path errors can be distinguished
+    // from problems loading the TensorFlow Lite WebAssembly runtime.
+    stage = "requesting the tea model file";
+    const modelUrl = new URL(AI_CONFIG.tfliteModelUrl, window.location.href).href;
+    const response = await fetch(modelUrl, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error("Model URL returned HTTP " + response.status + " at " + modelUrl);
+    }
+    const modelBuffer = await response.arrayBuffer();
+    if (modelBuffer.byteLength < 1000) {
+      throw new Error("The model URL returned only " + modelBuffer.byteLength + " bytes; it may be an HTML page instead of the .tflite file.");
+    }
+
+    stage = "initialising the TensorFlow Lite WebAssembly engine";
+    if (typeof tflite.setWasmPath === "function") {
+      tflite.setWasmPath(AI_CONFIG.wasmPath);
+    }
+
+    stage = "opening the downloaded tea model";
+    const loadedModel = await tflite.loadTFLiteModel(modelBuffer);
+    if (!loadedModel || typeof loadedModel.predict !== "function") {
+      throw new Error("The TFLite file did not provide a usable prediction function.");
+    }
+    if (model && typeof model.dispose === "function") model.dispose();
+    model = loadedModel;
+    modelLabels = [...TEA_LABELS];
+    status.textContent = "Tea AI model loaded successfully. Choose a clear tea-leaf photo and tap Analyse Crop.";
+    el("aiStatus").textContent = "Tea AI model is ready. Choose a clear tea-leaf photo.";
+  } catch (error) {
+    const detail = error && error.message ? error.message : String(error);
+    status.textContent = "Model loading stopped while " + stage + ": " + detail + ". Check internet access, then reload this page.";
+    el("aiStatus").textContent = "Tea AI model could not load. Read AI Model Status for the specific error.";
+    console.error("AgriScan Pro tea model loading error at stage: " + stage, error);
+  } finally {
+    modelLoading = false;
+  }
+}
+loadTeaModelAutomatically();
+
+window.addEventListener("online", updateConnection);
+window.addEventListener("offline", updateConnection);
+</script>
+</body>
+</html>
+
+      
